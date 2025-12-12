@@ -9,4 +9,9 @@ export default defineConfig({
     // Port 6000 é bloqueada por alguns browsers (ERR_UNSAFE_PORT). Usamos 5173.
     port: 5173,
   },
+  preview: {
+    host: true,
+    port: 5173,
+    allowedHosts: 'all', // Permite qualquer domínio
+  },
 })
