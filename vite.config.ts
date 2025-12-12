@@ -12,6 +12,6 @@ export default defineConfig({
   preview: {
     host: true,
     port: 5173,
-    allowedHosts: 'all', // Permite qualquer domínio
+    allowedHosts: true, // Permite qualquer domínio
   },
 })
