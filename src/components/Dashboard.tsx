@@ -188,7 +188,7 @@ const Dashboard = () => {
             <Waves className="w-5 h-5 text-cyan-300" />
             <div>
               <p className="text-lg font-semibold">Estado do Estendal</p>
-              <p className="text-sm text-slate-400">Reage a chuva e ao limite de humidade</p>
+              <p className="text-sm text-slate-400">Estado atual do servo motor</p>
             </div>
           </div>
           <div className="mt-4">

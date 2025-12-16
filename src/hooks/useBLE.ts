@@ -58,21 +58,9 @@ export const useBLE = () => {
 
     const parsed = parseSensorPacket(value)
     setSensorData(parsed)
-
-    // Ajuste heurístico do estado do estendal
-    if (parsed.isRaining) {
-      setClotheslineState('FECHADO')
-      return
-    }
-
-    const { humidityTrigger } = useStore.getState()
-    if (typeof parsed.humidity === 'number') {
-      if (parsed.humidity >= humidityTrigger) {
-        setClotheslineState('FECHADO')
-      } else {
-        setClotheslineState('ABERTO')
-      }
-    }
+    // NOTA: Não atualizamos o estado do estendal aqui porque deve refletir
+    // apenas o estado real do servo (comandos manuais ou automáticos do ESP32).
+    // O estado é atualizado apenas quando enviamos comandos manuais.
   }
 
   const connect = useCallback(async () => {
