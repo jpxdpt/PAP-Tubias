@@ -68,8 +68,10 @@ export const useBLE = () => {
     const hasRecentManualCommand = lastManualCommandTime && (now - lastManualCommandTime < MANUAL_COMMAND_TIMEOUT_MS)
     
     // Chuva tem sempre prioridade máxima, mesmo com comando manual recente
+    // Limpamos o timestamp do comando manual porque a chuva sobrescreve comandos manuais
     if (parsed.isRaining) {
       setClotheslineState('FECHADO')
+      useStore.setState({ lastManualCommandTime: undefined }) // Limpa o comando manual para permitir atualização quando parar de chover
       return
     }
     
