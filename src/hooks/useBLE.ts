@@ -59,13 +59,25 @@ export const useBLE = () => {
     const parsed = parseSensorPacket(value)
     setSensorData(parsed)
     
+    const TEMP_MIN = 20 // Mesmo valor do código Arduino
+    const { humidityTrigger } = useStore.getState()
+    
     // Quando detectamos chuva, sabemos que o ESP32 fecha automaticamente o servo
-    // então atualizamos o estado para refletir isso
     if (parsed.isRaining) {
       setClotheslineState('FECHADO')
+      return
     }
-    // NOTA: Não atualizamos o estado baseado apenas em humidade porque pode haver
-    // um comando manual ativo. O estado é atualizado por comandos manuais ou quando chove.
+    
+    // Quando não há chuva, atualizamos o estado baseado nas condições:
+    // - Condições boas (temp >= TEMP_MIN e hum <= trigger) → ABERTO
+    // - Condições não boas → FECHADO
+    if (typeof parsed.temperature === 'number' && typeof parsed.humidity === 'number') {
+      if (parsed.temperature >= TEMP_MIN && parsed.humidity <= humidityTrigger) {
+        setClotheslineState('ABERTO')
+      } else {
+        setClotheslineState('FECHADO')
+      }
+    }
   }
 
   const connect = useCallback(async () => {
