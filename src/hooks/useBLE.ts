@@ -58,9 +58,14 @@ export const useBLE = () => {
 
     const parsed = parseSensorPacket(value)
     setSensorData(parsed)
-    // NOTA: Não atualizamos o estado do estendal aqui porque deve refletir
-    // apenas o estado real do servo (comandos manuais ou automáticos do ESP32).
-    // O estado é atualizado apenas quando enviamos comandos manuais.
+    
+    // Quando detectamos chuva, sabemos que o ESP32 fecha automaticamente o servo
+    // então atualizamos o estado para refletir isso
+    if (parsed.isRaining) {
+      setClotheslineState('FECHADO')
+    }
+    // NOTA: Não atualizamos o estado baseado apenas em humidade porque pode haver
+    // um comando manual ativo. O estado é atualizado por comandos manuais ou quando chove.
   }
 
   const connect = useCallback(async () => {
