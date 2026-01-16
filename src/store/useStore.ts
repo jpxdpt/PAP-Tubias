@@ -21,12 +21,14 @@ interface StoreState {
   humidityTrigger: number
   clotheslineState: ClotheslineState
   commandStatus: CommandStatus
+  lastManualCommandTime?: number
   setConnectionState: (state: ConnectionState, error?: string) => void
   setDeviceName: (name?: string) => void
   setSensorData: (data: Partial<Pick<SensorState, 'temperature' | 'humidity' | 'isRaining'>>) => void
   setHumidityTrigger: (value: number) => void
   setClotheslineState: (state: ClotheslineState) => void
   setCommandStatus: (status: CommandStatus) => void
+  setLastManualCommandTime: (time: number) => void
   reset: () => void
 }
 
@@ -39,6 +41,7 @@ export const useStore = create<StoreState>((set) => ({
   humidityTrigger: 70,
   clotheslineState: 'DESCONHECIDO',
   commandStatus: 'idle',
+  lastManualCommandTime: undefined,
   sensors: {
     temperature: null,
     humidity: null,
@@ -80,12 +83,14 @@ export const useStore = create<StoreState>((set) => ({
   setHumidityTrigger: (value) => set({ humidityTrigger: value }),
   setClotheslineState: (state) => set({ clotheslineState: state }),
   setCommandStatus: (status) => set({ commandStatus: status }),
+  setLastManualCommandTime: (time) => set({ lastManualCommandTime: time }),
   reset: () =>
     set({
       connectionState: 'disconnected',
       deviceName: undefined,
       commandStatus: 'idle',
       clotheslineState: 'DESCONHECIDO',
+      lastManualCommandTime: undefined,
       sensors: {
         temperature: null,
         humidity: null,

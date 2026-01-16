@@ -35,8 +35,10 @@ const friendlyError = (error: unknown) => {
   return (error as Error)?.message ?? 'Erro desconhecido ao usar Bluetooth.'
 }
 
+const MANUAL_COMMAND_TIMEOUT_MS = 30000 // 30 segundos, mesmo que no código Arduino
+
 export const useBLE = () => {
-  const { setConnectionState, setSensorData, setClotheslineState, setCommandStatus, setDeviceName, reset } =
+  const { setConnectionState, setSensorData, setClotheslineState, setCommandStatus, setDeviceName, setLastManualCommandTime, reset } =
     useStore()
 
   const deviceRef = useRef<BluetoothDevice | null>(null)
@@ -59,18 +61,28 @@ export const useBLE = () => {
     const parsed = parseSensorPacket(value)
     setSensorData(parsed)
     
-    const TEMP_MIN = 20 // Mesmo valor do código Arduino
-    const { humidityTrigger } = useStore.getState()
+    const { humidityTrigger, lastManualCommandTime } = useStore.getState()
     
-    // Quando detectamos chuva, sabemos que o ESP32 fecha automaticamente o servo
+    // Verifica se há um comando manual recente (dentro do timeout)
+    const now = Date.now()
+    const hasRecentManualCommand = lastManualCommandTime && (now - lastManualCommandTime < MANUAL_COMMAND_TIMEOUT_MS)
+    
+    // Chuva tem sempre prioridade máxima, mesmo com comando manual recente
     if (parsed.isRaining) {
       setClotheslineState('FECHADO')
       return
     }
     
-    // Quando não há chuva, atualizamos o estado baseado nas condições:
+    // Se há um comando manual recente, não atualizamos o estado automaticamente
+    // (exceto chuva que já foi tratada acima)
+    if (hasRecentManualCommand) {
+      return
+    }
+    
+    // Quando não há chuva e não há comando manual recente, atualizamos o estado baseado nas condições:
     // - Condições boas (temp >= TEMP_MIN e hum <= trigger) → ABERTO
     // - Condições não boas → FECHADO
+    const TEMP_MIN = 20 // Mesmo valor do código Arduino
     if (typeof parsed.temperature === 'number' && typeof parsed.humidity === 'number') {
       if (parsed.temperature >= TEMP_MIN && parsed.humidity <= humidityTrigger) {
         setClotheslineState('ABERTO')
@@ -156,14 +168,18 @@ export const useBLE = () => {
         } else {
           await characteristic.writeValue(payload)
         }
-        setClotheslineState(command === 'extend' ? 'ABERTO' : 'FECHADO')
+        
+        // Atualiza o estado e regista o timestamp do comando manual
+        const newState = command === 'extend' ? 'ABERTO' : 'FECHADO'
+        setClotheslineState(newState)
+        setLastManualCommandTime(Date.now())
       } catch (error) {
         setConnectionState('error', friendlyError(error))
       } finally {
         setCommandStatus('idle')
       }
     },
-    [setClotheslineState, setCommandStatus, setConnectionState],
+    [setClotheslineState, setCommandStatus, setConnectionState, setLastManualCommandTime],
   )
 
   useEffect(
