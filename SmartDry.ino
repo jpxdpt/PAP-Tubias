@@ -232,9 +232,9 @@ void loop() {
     }
   }
 
-  // notificacao BLE periodica (~1s)
+  // notificacao BLE periodica (~0.5s)
   static uint32_t lastNotify = 0;
-  if (millis() - lastNotify > 1000) {
+  if (millis() - lastNotify > 500) {
     lastNotify = millis();
     float tempSend = leituraInvalida ? NAN : t;
     float humSend = leituraInvalida ? NAN : h;

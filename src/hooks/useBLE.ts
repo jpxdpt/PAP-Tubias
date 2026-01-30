@@ -61,11 +61,9 @@ export const useBLE = () => {
     const parsed = parseSensorPacket(value)
     setSensorData(parsed)
 
-    // Lógica de segurança: se a app sabe que está a chover, o estendal TEM de aparecer como FECHADO
-    if (parsed.isRaining) {
-      setClotheslineState('FECHADO')
-    } else if (parsed.clotheslineState) {
-      // Caso contrário, confia no que o hardware reporta especificamente
+    // O hardware é a autoridade máxima sobre o estado do motor.
+    // Se o pacote contém o estado do estendal, usamos esse valor diretamente.
+    if (parsed.clotheslineState !== undefined) {
       setClotheslineState(parsed.clotheslineState as any)
     }
   }
