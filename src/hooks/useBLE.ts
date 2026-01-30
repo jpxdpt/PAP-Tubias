@@ -63,7 +63,7 @@ export const useBLE = () => {
 
     // O estado reportado pelo hardware é a fonte da verdade
     if (parsed.clotheslineState) {
-      setClotheslineState(parsed.clotheslineState)
+      setClotheslineState(parsed.clotheslineState as any)
     }
   }
 
