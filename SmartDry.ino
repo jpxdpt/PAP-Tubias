@@ -17,7 +17,7 @@
 
 // Limites
 #define TEMP_MIN 20
-#define HUM_MAX  70
+int humMax = 70; // Agora e variavel para permitir ajuste via BLE
 
 // UUIDs BLE
 static BLEUUID SERVICE_UUID("0000ABCD-0000-1000-8000-00805F9B34FB");
@@ -54,17 +54,23 @@ void buzzerBeep(int freq, int ms) {
 
 // NAO mexe no LED; so no servo
 void setEstendal(EstadoEstendal novo) {
-  estadoEstendal = novo;
-  servoEstendal.write(novo == EST_ESTENDIDO ? anguloEstendido : anguloRecolhido);
+  // Apenas escreve no servo se o estado mudar para evitar jitter
+  if (estadoEstendal != novo) {
+    estadoEstendal = novo;
+    servoEstendal.write(novo == EST_ESTENDIDO ? anguloEstendido : anguloRecolhido);
+    Serial.print("Estendal mudou para: ");
+    Serial.println(novo == EST_ESTENDIDO ? "ESTENDIDO" : "RECOLHIDO");
+  }
 }
 
-// payload: Float32 temp, Float32 hum, Uint8 chuva (1/0), little-endian
-void enviarNotificacao(float t, float h, bool chuva) {
+// payload: Float32 temp, Float32 hum, Uint8 chuva (1/0), Uint8 estadoEstendal (1/0), little-endian
+void enviarNotificacao(float t, float h, bool chuva, EstadoEstendal estado) {
   if (!deviceConnected || !pSensorChar) return;
-  uint8_t payload[9];
+  uint8_t payload[10];
   memcpy(payload + 0, &t, sizeof(float));
   memcpy(payload + 4, &h, sizeof(float));
   payload[8] = chuva ? 1 : 0;
+  payload[9] = (estado == EST_ESTENDIDO) ? 1 : 0;
   pSensorChar->setValue(payload, sizeof(payload));
   pSensorChar->notify();
 }
@@ -90,6 +96,10 @@ class CommandCallbacks : public BLECharacteristicCallbacks {
       setEstendal(EST_ESTENDIDO);
     } else if (cmd == 0x02) {
       setEstendal(EST_RECOLHIDO);
+    } else if (cmd == 0x03 && len >= 2) {
+      humMax = data[1];
+      Serial.print("Novo limite de humidade: ");
+      Serial.println(humMax);
     }
   }
 };
@@ -191,7 +201,7 @@ void loop() {
   } else if (!comandoManualAtivo) {
     // So executa logica automatica se nao houver comando manual ativo
     digitalWrite(PINO_LED, LOW); // LED OFF fora de chuva
-    if (!leituraInvalida && (t >= TEMP_MIN) && (h <= HUM_MAX)) {
+    if (!leituraInvalida && (t >= TEMP_MIN) && (h <= humMax)) {
       setEstendal(EST_ESTENDIDO);
       lcd.setCursor(0, 1);
       lcd.print("Bom p/ secar  ");
@@ -221,7 +231,7 @@ void loop() {
     lastNotify = millis();
     float tempSend = leituraInvalida ? NAN : t;
     float humSend = leituraInvalida ? NAN : h;
-    enviarNotificacao(tempSend, humSend, taChover);
+    enviarNotificacao(tempSend, humSend, taChover, estadoEstendal);
   }
 
   delay(500);  // ciclo mais rapido, sem buzzer constante

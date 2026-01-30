@@ -5,18 +5,20 @@ const SERVICE_UUID = '0000abcd-0000-1000-8000-00805f9b34fb'
 const SENSOR_CHARACTERISTIC_UUID = '0000abce-0000-1000-8000-00805f9b34fb'
 const COMMAND_CHARACTERISTIC_UUID = '0000abcf-0000-1000-8000-00805f9b34fb'
 
-type Command = 'extend' | 'retract'
+type Command = 'extend' | 'retract' | { type: 'setHumidity'; value: number }
 
 const parseSensorPacket = (value: DataView) => {
-  // Espera-se: Float32 temp (0-3), Float32 humidade (4-7), Uint8 chuva (8)
+  // Espera-se: Float32 temp (0-3), Float32 humidade (4-7), Uint8 chuva (8), Uint8 estado (9)
   const temperature = value.byteLength >= 4 ? value.getFloat32(0, true) : Number.NaN
   const humidity = value.byteLength >= 8 ? value.getFloat32(4, true) : Number.NaN
   const rainByte = value.byteLength >= 9 ? value.getUint8(8) : 0
+  const stateByte = value.byteLength >= 10 ? value.getUint8(9) : undefined
 
   return {
     temperature: Number.isFinite(temperature) ? temperature : null,
     humidity: Number.isFinite(humidity) ? humidity : null,
     isRaining: rainByte === 1,
+    clotheslineState: stateByte === 1 ? 'ABERTO' : (stateByte === 0 ? 'FECHADO' : undefined),
   }
 }
 
@@ -34,8 +36,6 @@ const friendlyError = (error: unknown) => {
   }
   return (error as Error)?.message ?? 'Erro desconhecido ao usar Bluetooth.'
 }
-
-const MANUAL_COMMAND_TIMEOUT_MS = 30000 // 30 segundos, mesmo que no código Arduino
 
 export const useBLE = () => {
   const { setConnectionState, setSensorData, setClotheslineState, setCommandStatus, setDeviceName, setLastManualCommandTime, reset } =
@@ -60,37 +60,10 @@ export const useBLE = () => {
 
     const parsed = parseSensorPacket(value)
     setSensorData(parsed)
-    
-    const { humidityTrigger, lastManualCommandTime } = useStore.getState()
-    
-    // Verifica se há um comando manual recente (dentro do timeout)
-    const now = Date.now()
-    const hasRecentManualCommand = lastManualCommandTime && (now - lastManualCommandTime < MANUAL_COMMAND_TIMEOUT_MS)
-    
-    // Chuva tem sempre prioridade máxima, mesmo com comando manual recente
-    // Limpamos o timestamp do comando manual porque a chuva sobrescreve comandos manuais
-    if (parsed.isRaining) {
-      setClotheslineState('FECHADO')
-      useStore.setState({ lastManualCommandTime: undefined }) // Limpa o comando manual para permitir atualização quando parar de chover
-      return
-    }
-    
-    // Se há um comando manual recente, não atualizamos o estado automaticamente
-    // (exceto chuva que já foi tratada acima)
-    if (hasRecentManualCommand) {
-      return
-    }
-    
-    // Quando não há chuva e não há comando manual recente, atualizamos o estado baseado nas condições:
-    // - Condições boas (temp >= TEMP_MIN e hum <= trigger) → ABERTO
-    // - Condições não boas → FECHADO
-    const TEMP_MIN = 20 // Mesmo valor do código Arduino
-    if (typeof parsed.temperature === 'number' && typeof parsed.humidity === 'number') {
-      if (parsed.temperature >= TEMP_MIN && parsed.humidity <= humidityTrigger) {
-        setClotheslineState('ABERTO')
-      } else {
-        setClotheslineState('FECHADO')
-      }
+
+    // O estado reportado pelo hardware é a fonte da verdade
+    if (parsed.clotheslineState) {
+      setClotheslineState(parsed.clotheslineState)
     }
   }
 
@@ -164,17 +137,26 @@ export const useBLE = () => {
         }
 
         const characteristic = commandCharacteristicRef.current
-        const payload = new Uint8Array([command === 'extend' ? 0x01 : 0x02])
-        if ('writeValueWithResponse' in characteristic && typeof characteristic.writeValueWithResponse === 'function') {
-          await characteristic.writeValueWithResponse(payload)
+        let payload: Uint8Array
+
+        if (typeof command === 'string') {
+          payload = new Uint8Array([command === 'extend' ? 0x01 : 0x02])
         } else {
-          await characteristic.writeValue(payload)
+          payload = new Uint8Array([0x03, command.value])
         }
-        
-        // Atualiza o estado e regista o timestamp do comando manual
-        const newState = command === 'extend' ? 'ABERTO' : 'FECHADO'
-        setClotheslineState(newState)
-        setLastManualCommandTime(Date.now())
+
+        if ('writeValueWithResponse' in characteristic && typeof (characteristic as any).writeValueWithResponse === 'function') {
+          await (characteristic as any).writeValueWithResponse(payload)
+        } else {
+          await (characteristic as any).writeValue(payload)
+        }
+
+        // Se for comando de movimento, atualiza o timestamp manual
+        if (typeof command === 'string') {
+          const newState = command === 'extend' ? 'ABERTO' : 'FECHADO'
+          setClotheslineState(newState)
+          setLastManualCommandTime(Date.now())
+        }
       } catch (error) {
         setConnectionState('error', friendlyError(error))
       } finally {
@@ -197,4 +179,3 @@ export const useBLE = () => {
     sendCommand,
   }
 }
-

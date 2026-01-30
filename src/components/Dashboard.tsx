@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useEffect } from 'react'
 import {
   Bluetooth,
   Loader2,
@@ -90,6 +90,16 @@ const Dashboard = () => {
   const isConnecting = connectionState === 'connecting'
 
   const humidityPercent = Math.min(100, Math.max(0, sensors.humidity ?? 0))
+
+  // Sincroniza o trigger de humidade com o hardware (com debounce)
+  useEffect(() => {
+    if (isConnected) {
+      const timeout = setTimeout(() => {
+        void sendCommand({ type: 'setHumidity', value: humidityTrigger })
+      }, 1000)
+      return () => clearTimeout(timeout)
+    }
+  }, [humidityTrigger, isConnected, sendCommand])
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 md:py-12">
