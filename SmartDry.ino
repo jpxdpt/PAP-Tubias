@@ -71,6 +71,13 @@ void enviarNotificacao(float t, float h, bool chuva, EstadoEstendal estado) {
   memcpy(payload + 4, &h, sizeof(float));
   payload[8] = chuva ? 1 : 0;
   payload[9] = (estado == EST_ESTENDIDO) ? 1 : 0;
+  
+  // Debug via Serial
+  Serial.print("BLE Notify -> T:"); Serial.print(t, 1);
+  Serial.print(" H:"); Serial.print(h, 0);
+  Serial.print(" Chuva:"); Serial.print(chuva ? "SIM" : "NAO");
+  Serial.print(" Estendal:"); Serial.println(estado == EST_ESTENDIDO ? "ABERTO" : "FECHADO");
+
   pSensorChar->setValue(payload, sizeof(payload));
   pSensorChar->notify();
 }
